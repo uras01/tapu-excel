@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tapu PDF → Excel</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#06080e;--s1:#0c0f1a;--s2:#111624;--s3:#181e2e;--b:#1f2840;--a:#d4a843;--t:#dde4f0;--m:#68788f;--ok:#2ecc8f;--err:#e05c5c}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--t);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2.5rem 1rem 5rem}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse 60% 40% at 20% 10%,rgba(212,168,67,.07) 0,transparent 60%),radial-gradient(ellipse 50% 35% at 80% 90%,rgba(59,125,216,.06) 0,transparent 60%)}
+.container{width:100%;max-width:960px;position:relative;z-index:1}
+.header{text-align:center;margin-bottom:2.5rem}
+.eyebrow{display:inline-flex;align-items:center;gap:.4rem;font-size:.65rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--a);margin-bottom:.9rem;opacity:.85}
+.eyebrow::before,.eyebrow::after{content:'';width:24px;height:1px;background:currentColor;opacity:.5}
+h1{font-family:'Instrument Serif',serif;font-size:clamp(2rem,5vw,2.8rem);font-weight:400;line-height:1.1;background:linear-gradient(135deg,#dde4f0 0%,#d4a843 50%,#3b7dd8 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.5rem}
+.sub{color:var(--m);font-size:.88rem;line-height:1.6}
+.card{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:1.75rem;margin-bottom:1.25rem;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;background:linear-gradient(90deg,transparent,rgba(212,168,67,.4),transparent)}
+.drop{border:1.5px dashed var(--b);border-radius:8px;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:.2s;background:var(--s2);position:relative}
+.drop:hover,.drop.over{border-color:var(--a);background:rgba(212,168,67,.04)}
+.drop input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-ico{width:52px;height:52px;margin:0 auto 1rem;border-radius:12px;background:linear-gradient(135deg,rgba(212,168,67,.18),rgba(59,125,216,.1));border:1px solid rgba(212,168,67,.22);display:flex;align-items:center;justify-content:center}
+.drop-ico svg{width:24px;height:24px;stroke:var(--a)}
+.drop h3{font-size:.95rem;font-weight:500;margin-bottom:.3rem}
+.drop p{font-size:.75rem;color:var(--m)}
+.lnk{color:var(--a);text-decoration:underline;text-underline-offset:3px}
+.fpill{display:none;align-items:center;gap:.8rem;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:.8rem 1rem;margin-top:.85rem}
+.fpill.show{display:flex}
+.ficon{width:36px;height:36px;flex-shrink:0;border-radius:8px;background:rgba(212,168,67,.1);border:1px solid rgba(212,168,67,.2);display:flex;align-items:center;justify-content:center}
+.ficon svg{width:16px;height:16px;stroke:var(--a)}
+.fname{font-size:.85rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fsize{font-size:.7rem;color:var(--m)}
+.btn{width:100%;margin-top:1rem;padding:.85rem 1.5rem;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:.18s}
+.btn-main{background:linear-gradient(135deg,#b88a2a,#d4a843);color:#0a0700}
+.btn-main:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-main:disabled{opacity:.35;cursor:not-allowed;transform:none;filter:none}
+.prog{margin-top:.9rem;display:none}.prog.show{display:block}
+.prog-row{display:flex;justify-content:space-between;font-size:.73rem;color:var(--m);margin-bottom:.4rem}
+.prog-bg{height:3px;background:var(--s3);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,#b88a2a,#d4a843 60%,#3b7dd8);border-radius:99px;width:0;transition:width .35s ease}
+.status{margin-top:.85rem;padding:.65rem 1rem;border-radius:8px;font-size:.8rem;display:none;align-items:center;gap:.5rem}
+.status.show{display:flex}
+.s-ok{background:rgba(46,204,143,.08);border:1px solid rgba(46,204,143,.2);color:var(--ok)}
+.s-er{background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.2);color:var(--err)}
+.dl{display:none;margin-top:1rem}.dl.show{display:block}
+.dl-card{background:linear-gradient(135deg,rgba(46,204,143,.07),rgba(212,168,67,.05));border:1px solid rgba(46,204,143,.18);border-radius:8px;padding:1.1rem 1.3rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.dl-info{flex:1;min-width:140px}
+.dl-info h4{font-size:.88rem;font-weight:600;margin-bottom:.18rem}
+.dl-info p{font-size:.72rem;color:var(--m)}
+.btn-dl{padding:.65rem 1.2rem;background:linear-gradient(135deg,#1a8a5e,#2ecc8f);border:none;border-radius:8px;color:#011a0d;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.4rem;white-space:nowrap;transition:.18s}
+.btn-dl:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.preview{display:none;margin-top:1.5rem}.preview.show{display:block}
+.prev-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;flex-wrap:wrap;gap:.5rem}
+.prev-head h2{font-family:'Instrument Serif',serif;font-size:1.3rem;font-weight:400}
+.cnt{font-size:.7rem;color:var(--m);background:var(--s2);border:1px solid var(--b);padding:.25rem .65rem;border-radius:99px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--b);border-radius:8px;max-height:400px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:.69rem;min-width:860px}
+thead{position:sticky;top:0;z-index:2}
+th{background:var(--s3);padding:.55rem .75rem;text-align:left;font-weight:600;font-size:.63rem;letter-spacing:.07em;text-transform:uppercase;color:var(--m);border-bottom:1px solid var(--b);white-space:nowrap}
+th.new{color:var(--a);background:rgba(212,168,67,.09)}
+tbody tr{border-bottom:1px solid var(--b);transition:.1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--s2)}
+td{padding:.5rem .75rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;vertical-align:middle}
+td.hl{color:var(--a);font-weight:500}
+.note{margin-top:.55rem;font-size:.67rem;color:var(--m);text-align:center}
+@keyframes spin{to{transform:rotate(360deg)}}.spin{animation:spin .7s linear infinite}
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:99px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="eyebrow">WebTapu Belge İşleyici</div>
+    <h1>Tapu PDF → Excel</h1>
+    <p class="sub">MÜLKİYET BİLGİLERİ tablosu otomatik ayıklanır — Adı-Soyadı · Pay · Payda sütunları eklenir.</p>
+  </div>
+
+  <div class="card">
+    <div class="drop" id="drop">
+      <input type="file" id="fi" accept=".pdf">
+      <div class="drop-ico"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg></div>
+      <h3>PDF'i buraya sürükle</h3>
+      <p>veya <span class="lnk">dosya seç</span> · WebTapu tapu senedi</p>
+    </div>
+    <div class="fpill" id="pill">
+      <div class="ficon"><svg fill="none" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg></div>
+      <div style="flex:1;min-width:0"><div class="fname" id="fname"></div><div class="fsize" id="fsize"></div></div>
+    </div>
+    <button class="btn btn-main" id="btn" disabled onclick="run()">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg>
+      Excel'e Dönüştür
+    </button>
+    <div class="prog" id="prog"><div class="prog-row"><span id="plbl">—</span><span id="ppct">0%</span></div><div class="prog-bg"><div class="prog-fill" id="pfill"></div></div></div>
+    <div class="status" id="st"></div>
+    <div class="dl" id="dl">
+      <div class="dl-card">
+        <div class="dl-info"><h4>Excel hazır ✓</h4><p id="dlp"></p></div>
+        <button class="btn-dl" id="dlbtn"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>Excel'i İndir</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="preview" id="prev">
+    <div class="prev-head"><h2>MÜLKİYET BİLGİLERİ</h2><span class="cnt" id="cnt">—</span></div>
+    <div class="tbl-wrap"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    <p class="note">Tüm satırlar Excel dosyasına aktarılmaktadır.</p>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let selFile=null, xlsxBlob=null;
+
+$('fi').onchange=e=>setFile(e.target.files[0]);
+const drop=$('drop');
+drop.ondragover=e=>{e.preventDefault();drop.classList.add('over')};
+drop.ondragleave=()=>drop.classList.remove('over');
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer.files[0];f?.type==='application/pdf'?setFile(f):showSt('s-er','Lütfen PDF dosyası seçin.')};
+function setFile(f){selFile=f;$('fname').textContent=f.name;$('fsize').textContent=(f.size/1024).toFixed(1)+' KB';$('pill').classList.add('show');$('btn').disabled=false;$('dl').classList.remove('show');$('prev').classList.remove('show');hideSt();xlsxBlob=null;}
+
+async function run(){
+  if(!selFile)return;
+  const btn=$('btn');btn.disabled=true;
+  btn.innerHTML='<svg class="spin" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/></svg> İşleniyor…';
+  setP(10,'PDF gönderiliyor…');hideSt();$('dl').classList.remove('show');$('prev').classList.remove('show');
+  try{
+    const fd=new FormData();
+    fd.append('pdf',selFile,selFile.name);
+    setP(30,'Sunucuda işleniyor…');
+    const res=await fetch('/api/convert',{method:'POST',body:fd});
+    setP(80,'Excel alınıyor…');
+    if(!res.ok){const e=await res.json().catch(()=>({error:'Sunucu hatası'}));throw new Error(e.error);}
+    xlsxBlob=await res.blob();
+    setP(95,'Önizleme hazırlanıyor…');
+    const rows=await readExcelPreview(await xlsxBlob.arrayBuffer());
+    renderTable(rows);
+    $('dlp').textContent=rows.length+' kayıt · '+selFile.name.replace('.pdf','');
+    $('dlbtn').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(xlsxBlob);a.download=selFile.name.replace('.pdf','')+'_mulkiyet.xlsx';a.click();URL.revokeObjectURL(a.href);};
+    setP(100,'Tamamlandı');
+    showSt('s-ok','✓ '+rows.length+' kayıt işlendi.');
+    $('dl').classList.add('show');$('prev').classList.add('show');
+  }catch(e){showSt('s-er','⚠ '+e.message);console.error(e);}
+  finally{
+    $('prog').classList.remove('show');btn.disabled=false;
+    btn.innerHTML='<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 12c0-1.232-.046-2.453-.138-3.662a4.006 4.006 0 00-3.7-3.7 48.678 48.678 0 00-7.324 0 4.006 4.006 0 00-3.7 3.7c-.017.22-.032.441-.046.662M19.5 12l3-3m-3 3l-3-3m-12 3c0 1.232.046 2.453.138 3.662a4.006 4.006 0 003.7 3.7 48.656 48.656 0 007.324 0 4.006 4.006 0 003.7-3.7c.017-.22.032-.441.046-.662M4.5 12l3 3m-3-3l-3 3"/></svg> Excel\'e Dönüştür';
+  }
+}
+
+function readExcelPreview(buf){
+  const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  const headers=data[1]||[];
+  return data.slice(2).filter(r=>r.some(c=>c)).map(r=>{const o={};headers.forEach((h,i)=>o[h]=r[i]??'');return o;});
+}
+
+function renderTable(rows){
+  if(!rows.length)return;
+  const NEW=new Set(['Adı-Soyadı','Pay','Payda']),keys=Object.keys(rows[0]);
+  $('th').innerHTML='<tr>'+keys.map(k=>`<th${NEW.has(k)?' class="new"':''}>${k}${NEW.has(k)?' ✦':''}</th>`).join('')+'</tr>';
+  $('tb').innerHTML=rows.map(r=>'<tr>'+keys.map(k=>`<td${NEW.has(k)?' class="hl"':''}>${esc(r[k]??'')}</td>`).join('')+'</tr>').join('');
+  $('cnt').textContent=rows.length+' kayıt';
+}
+
+function setP(pct,lbl){$('prog').classList.add('show');$('pfill').style.width=pct+'%';$('ppct').textContent=pct+'%';if(lbl)$('plbl').textContent=lbl}
+function showSt(cls,msg){const el=$('st');el.className='status show '+cls;el.textContent=msg}
+function hideSt(){$('st').classList.remove('show')}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+</script>
+</body>
+</html>
