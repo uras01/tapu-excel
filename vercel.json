@@ -1,5 +1,7 @@
 {
-  "rewrites": [
-    { "source": "/api/convert", "destination": "/api/convert.py" }
-  ]
+  "functions": {
+    "api/convert.py": {
+      "runtime": "vercel-python@3.0.0"
+    }
+  }
 }
