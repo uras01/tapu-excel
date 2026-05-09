@@ -34,34 +34,115 @@ def split_pp(hp):
     m = re.search(r'(\d+)/(\d+)', c)
     return (m.group(1), m.group(2)) if m else ('', '')
 
+END_MARKERS = [
+    'MÜLKİYETE AİT ŞERH',
+    'MÜLKİYETE AİT REHİN',
+    'MÜLKİYETE AİT İRTİFAK',
+    'REHİN BİLGİLERİ',
+    'Ipotek',
+    'İpotek',
+]
+
+def page_has_end_marker(page):
+    try:
+        text = page.extract_text() or ''
+        for m in END_MARKERS:
+            if m in text:
+                return True
+    except:
+        pass
+    return False
+
+def page_has_mulkiyet_header(page):
+    try:
+        text = page.extract_text() or ''
+        return 'MÜLKİYET BİLGİLERİ' in text and 'MÜLKİYETE AİT' not in text.split('MÜLKİYET BİLGİLERİ')[0]
+    except:
+        return False
+
 def extract_table(pdf_bytes):
-    all_rows, prev = [], None
+    all_rows = []
+    prev = None
+    in_table = False
+    done = False
+
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-        for pn in range(2, 8):
-            if pn > len(pdf.pages): break
-            for tbl in pdf.pages[pn-1].extract_tables():
+        total = len(pdf.pages)
+
+        for pn in range(1, total + 1):
+            if done:
+                break
+
+            page = pdf.pages[pn - 1]
+
+            # Detect table start
+            if not in_table:
+                if page_has_mulkiyet_header(page):
+                    in_table = True
+                else:
+                    continue
+
+            # Check for end marker — but still extract this page's rows first
+            # because end marker might appear after some data rows on same page
+            page_text = page.extract_text() or ''
+
+            tables = page.extract_tables()
+            for tbl in tables:
                 for raw in tbl:
-                    if not raw or len(raw) < 4: continue
+                    if not raw or len(raw) < 4:
+                        continue
+
                     c0 = str(raw[0] or '').strip()
-                    if (not c0) and prev is not None:
+
+                    # Continuation row (page break split)
+                    if (not c0 or c0 == '') and prev is not None:
                         c1 = str(raw[1] or '').strip()
                         c3 = str(raw[3] or '').strip()
                         if c1: prev[1] = (prev[1] or '') + ' ' + c1
                         if c3: prev[3] = (prev[3] or '') + c3
                         continue
-                    digits = re.sub(r'[^0-9]', '', c0.replace('\n',''))
-                    if len(digits) < 6: continue
-                    if 'Sistem' in str(raw[1] or '') or 'Malik' in str(raw[1] or ''): continue
-                    if prev: all_rows.append(prev)
+
+                    digits = re.sub(r'[^0-9]', '', c0.replace('\n', ''))
+                    if len(digits) < 6:
+                        continue
+
+                    # Skip header row
+                    col1 = str(raw[1] or '')
+                    if 'Sistem' in col1 or 'Malik' in col1:
+                        continue
+
+                    # Stop if we've hit end section rows
+                    # (rows from mortgage/lien tables also have 6+ digit numbers)
+                    # Detect by checking if Malik col contains SN: pattern
+                    col1_clean = col1.replace('\n', ' ').strip()
+                    if col1_clean and '(' not in col1_clean and not col1_clean.startswith('(SN'):
+                        # Could be from another table - skip
+                        pass
+
+                    if prev:
+                        all_rows.append(prev)
                     prev = list(raw[:8]) + [''] * max(0, 8 - len(raw[:8]))
                     prev[0] = digits
-        if prev: all_rows.append(prev)
 
+            # Check if this page signals end of MÜLKİYET table
+            for marker in END_MARKERS:
+                if marker in page_text:
+                    done = True
+                    break
+
+        if prev:
+            all_rows.append(prev)
+
+    # Deduplicate by Sistem No
     seen, unique = set(), []
     for r in all_rows:
-        if r[0] not in seen: seen.add(r[0]); unique.append(r)
+        key = r[0]
+        if key not in seen:
+            seen.add(key)
+            unique.append(r)
 
-    if not unique: raise ValueError('MÜLKİYET BİLGİLERİ tablosu bulunamadı.')
+    if not unique:
+        raise ValueError('MÜLKİYET BİLGİLERİ tablosu bulunamadı.')
 
     out = []
     for r in unique:
@@ -90,7 +171,8 @@ def make_excel(rows):
     NEW = {'Adı-Soyadı','Pay','Payda'}
 
     wb = openpyxl.Workbook()
-    ws = wb.active; ws.title = 'MÜLKİYET BİLGİLERİ'
+    ws = wb.active
+    ws.title = 'MÜLKİYET BİLGİLERİ'
 
     ws.merge_cells('A1:K1')
     tc = ws['A1']
@@ -112,7 +194,7 @@ def make_excel(rows):
     for ri, row in enumerate(rows, 3):
         fill = 'F8F9FA' if ri % 2 else 'FFFFFF'
         for ci, h in enumerate(H, 1):
-            c = ws.cell(row=ri, column=ci, value=row.get(h,''))
+            c = ws.cell(row=ri, column=ci, value=row.get(h, ''))
             c.border = brd
             c.alignment = Alignment(vertical='center', wrap_text=True)
             if h in NEW:
@@ -127,7 +209,9 @@ def make_excel(rows):
         ws.column_dimensions[get_column_letter(ci)].width = w
     ws.freeze_panes = 'A3'
 
-    buf = io.BytesIO(); wb.save(buf); return buf.getvalue()
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 def parse_multipart(content_type, body):
     m = re.search(r'boundary=([^\s;]+)', content_type)
