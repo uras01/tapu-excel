@@ -16,7 +16,10 @@ def fix_fraction(s):
     s = str(s)
     s = re.sub(r'(?m)^[A-ZÇĞİÖŞÜ]\n', '', s)
     s = re.sub(r'(\d)\n(\d)', r'\1\2', s)
-    return re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    # Sadece rakam ve slash bırak, harf/metin temizle
+    s = re.sub(r'[^0-9/]', '', s)
+    return s
 
 def clean_malik(s):
     s = clean_cell(s)
@@ -30,9 +33,14 @@ def extract_name(malik):
     return m2.group(1).strip() if m2 else ''
 
 def split_pp(hp):
-    c = re.sub(r'\s', '', hp)
+    c = re.sub(r'[^0-9/]', '', hp)
     m = re.search(r'(\d+)/(\d+)', c)
-    return (m.group(1), m.group(2)) if m else ('', '')
+    if m:
+        try:
+            return (int(m.group(1)), int(m.group(2)))
+        except:
+            return (m.group(1), m.group(2))
+    return ('', '')
 
 END_MARKERS = [
     'MÜLKİYETE AİT ŞERH',
@@ -200,6 +208,12 @@ def make_excel(rows):
             if h in NEW:
                 c.fill = PatternFill('solid', start_color='EBF5FB')
                 c.font = Font(name='Calibri', size=9, color='1A5276', bold=True)
+                if h in ('Pay', 'Payda') and c.value:
+                    try:
+                        c.value = int(c.value)
+                        c.number_format = '#,##0'
+                    except:
+                        pass
             else:
                 c.fill = PatternFill('solid', start_color=fill)
                 c.font = Font(name='Calibri', size=9)
