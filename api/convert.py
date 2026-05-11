@@ -217,6 +217,12 @@ def make_excel(rows):
             else:
                 c.fill = PatternFill('solid', start_color=fill)
                 c.font = Font(name='Calibri', size=9)
+                if h in ('Metrekare', 'Toplam Metrekare') and c.value:
+                    try:
+                        c.value = float(str(c.value).replace(',', '.'))
+                        c.number_format = '#,##0.00'
+                    except:
+                        pass
         ws.row_dimensions[ri].height = 16
 
     for ci, w in enumerate([14,38,22,13,16,8,10,12,15,28,16], 1):
