@@ -9,7 +9,10 @@ def clean_cell(s):
     if not s: return ''
     s = str(s)
     s = re.sub(r'(?m)^[A-ZÇĞİÖŞÜ]\n', '', s)
-    return re.sub(r'\s+', ' ', s).strip()
+    s = re.sub(r'\s+', ' ', s).strip()
+    # Sondaki tek harf watermark artıklarını temizle
+    s = re.sub(r'\s+[A-ZÇĞİÖŞÜ]$', '', s).strip()
+    return s
 
 def fix_fraction(s):
     if not s: return ''
